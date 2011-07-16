@@ -1,13 +1,29 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <util/delay.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "display.h"
+#include "font.h"
 #include "tetris.h"
 
 volatile uint8_t *volatile display_buffer; /* Buffer für Display */
 
-extern volatile board_t brd;
 extern volatile stone_t stn;
+
+void display_set(uint8_t col, uint8_t row, uint8_t val) {
+	if (val) {
+		display_buffer[row] |= (1 << col);
+	}
+	else {
+		display_buffer[row] &= ~(1 << col);
+	}
+}
+
+void display_toggle(uint8_t col, uint8_t row) {
+	display_buffer[row] ^= (1 << col);
+}
 
 /**
  * Initialisiere Display im Multiplexing Modus
@@ -35,32 +51,44 @@ uint8_t * display_print(char *text, uint8_t *buffer) {
 
 	strupr(text); /* Nur Großbuchstaben sind verfügbar */
 
-	for (uint16_t c = 0; c < len; c++) {
-		char chr = text[len-c-1];
-		uint8_t pattern;
-		
-		if (chr >= ' ' && chr <= '_')
-			pattern = chr - ' ';
-		else
-			pattern = 0; /* space */
+	for (uint16_t c = len-1; c >= 0; c--) {
+		char p = text[c];
+		char q = (p >= ' ' && p <= '_') ? p - ' ' : 0;
 	
-		for (uint8_t p = 0; p < 3; p++) {
-			buffer[p+c*4+16] = font[pattern][p];
-		}
-		//buffer[c*4+16] = 0; /* padding */
+		mempcpy(buffer[c*4], font[q], 3);
 	}
 	
 	return buffer;
 }
 
-void display_laufschrift(uint8_t *buffer, uint16_t bytes, uint8_t speed, uint8_t rounds) {
-	display_buffer = buffer;
-	while(1) {
-		if (display_buffer == buffer) {
-			display_buffer = buffer+bytes-16;
-			if (rounds-- == 0) {
-				return;
-			}
+void display_laufschrift(char *text, uint8_t speed, uint8_t rounds) {
+	uint16_t len = 4 * strlen(text) + 16; // 4 Bytes pro Character + 2 * 16 Bytes Padding
+	uint8_t *orig_buffer = display_buffer;
+	
+	volatile uint8_t *buffer = malloc(len);
+	
+	memset(buffer, 0, len);
+	display_buffer = display_print("test", buffer);
+
+	while ( TRUE ) {
+		buffer[15]++;
+		_delay_ms(500);
+	}
+	
+	//display_roll(buffer, len, speed, rounds);
+
+	display_buffer = orig_buffer; /* reset to old buffer */
+	free(buffer);
+}
+
+void display_roll(uint16_t bytes, uint8_t speed, uint8_t rounds) {
+	uint8_t *end_buffer = display_buffer;
+	display_buffer += bytes - 16;
+	
+	while (rounds) {
+		if (display_buffer == end_buffer) {
+			display_buffer = end_buffer + bytes - 16;
+			rounds--;
 		}
 		
 		display_buffer--;
@@ -73,32 +101,27 @@ void display_laufschrift(uint8_t *buffer, uint16_t bytes, uint8_t speed, uint8_t
  */
 ISR(TIMER0_COMP_vect) {
 	static uint8_t column;
-	static uint8_t counter;
 	
 	uint8_t row_mask = (1 << column);
 	uint16_t column_mask = 0;
 	
-	for (uint8_t i = 4; i < NUM_LINES; i++) {
-		if (row_mask & brd[i]) { /* fixed pixels, dimmed */
-			column_mask |= (1 << (i-4));
+	for (uint8_t i = 0; i < 16; i++) {
+		if (row_mask & display_buffer[i]) { /* fixed pixels, dimmed */
+			column_mask |= (1 << i);
 		}
 		
-		if (tetris) { /* in tetris mode ? */
-			if (i >= tetris->stn.pos_y && i < tetris->stn.pos_y+4) { /* in clipping of falling stone ? */
-				if (row_mask & tetris->stn.clipping[i-stn.pos_y]) {
-					column_mask |= (1 << (i-4));
-				}
+		if (i+4 >= stn.pos_y && i < stn.pos_y) { /* in clipping of falling stone ? */
+			if (row_mask & stn.clipping[i+4-stn.pos_y]) {
+				column_mask |= (1 << i);
 			}
 		}
 	}
 	
+	PORTD = 0;
 	PORTC = (uint8_t) column_mask;
 	PORTA = (uint8_t) (column_mask >> 8);
 	PORTD = row_mask;
 
 	column++;
-	if (column == 8) {
-		column = 0;
-		counter++;
-	}
+	column %= 8;
 }

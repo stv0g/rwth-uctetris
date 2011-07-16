@@ -62,7 +62,7 @@ TARGET = main
 OBJDIR = obj
 
 # List C source files here (C dependencies are automatically generated)
-SRC = $(TARGET).c tetris.c display.c
+SRC = $(TARGET).c tetris.c display.c conway.c
 
 # List C++ source files here (C dependencies are automatically generated)
 CPPSRC = 
@@ -248,7 +248,7 @@ AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 
 # Uncomment the following if you do /not/ wish a verification to be
 # performed after programming the device.
-#AVRDUDE_NO_VERIFY = -V
+AVRDUDE_NO_VERIFY = -V
 
 # Increase verbosity level
 #AVRDUDE_VERBOSE = -v -v

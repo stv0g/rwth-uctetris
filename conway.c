@@ -1,4 +1,9 @@
+#include <avr/io.h>
+#include <util/delay.h>
+#include <string.h>
+
 #include "main.h"
+#include "display.h"
 #include "conway.h"
 
 volatile extern uint8_t *volatile display_buffer; /* Buffer für Display */
@@ -62,14 +67,8 @@ void conway_start() {
 	
 	uint8_t  i = 0;
 	
-	/* populate world */
-	/* with pattern
-	worlds[i][1] |= 0b00001100;
-	worlds[i][2] |= 0b00011000;
-	worlds[i][3] |= 0b00001000;*/
-	
 	/* by random */
-	for (uint8_t q = 0; q < 8; q++) {
+	for (uint8_t q = 0; q < 32; q++) {
 		uint8_t row = rand() % 16;
 		uint8_t col = rand() % 8;
 		display_set(col, row, 1);
@@ -83,8 +82,17 @@ void conway_start() {
 		i = 1 - i; // switch world
 		
 		if (~PINB & KEY_Y) {
-			_delay_ms(10);
 			return; // exit
+		}
+		if (~PINB & KEY_A) {
+			worlds[i][7] |= 0b00001100;
+			worlds[i][8] |= 0b00011000;
+			worlds[i][9] |= 0b00001000;
+		}
+		if (~PINB & KEY_B) {
+			worlds[i][7] |= 0b00010000;
+			worlds[i][8] |= 0b00001000;
+			worlds[i][9] |= 0b00111000;
 		}
 	}
 }

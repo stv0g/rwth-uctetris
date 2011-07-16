@@ -12,11 +12,6 @@
 typedef uint8_t board_t[NUM_LINES];
 typedef uint8_t clipping_t[4];
 
-typedef struct {
-	stone_t stn;
-	board_t brd;
-} tetris_t;
-
 /* Named according to: http://de.wikipedia.org/wiki/Tetris */
 typedef enum {
 	SHAPE_I, /* line of four dots */

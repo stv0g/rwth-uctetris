@@ -1,11 +1,16 @@
 #include <avr/io.h>
+#include <util/delay.h>
 #include <stdlib.h>
 
 #include "main.h"
 #include "display.h"
 #include "tetris.h"
+#include "conway.h"
 
-static uint8_t rwth_logo[] = {0x7c, 0x50, 0x2c, 0x00, 0x78, 0x04, 0x18, 0x04, 0x78, 0x40, 0x7c, 0x40, 0x7c, 0x10, 0x7c, 0x00};
+volatile extern uint8_t *volatile display_buffer; /* Buffer für Display */
+
+static uint8_t rwth_logo[] = {0x00, 0x7c, 0x10, 0x7c, 0x40, 0x7c, 0x40, 0x78, 0x04, 0x18, 0x04, 0x78, 0x00, 0x2c, 0x50, 0x7c};
+static char bill_txt[] = "'Nobody will ever need more than 640k RAM!' - Bill Gates, 1981 ;-)";
 
 uint8_t get_seed() {
 	uint8_t seed = 0;
@@ -16,6 +21,22 @@ uint8_t get_seed() {
 		seed ^= * (--p);
     
 	return seed;
+}
+
+void random_start() {
+	volatile uint8_t random_buffer[16];
+	display_buffer = memset(random_buffer, 0, 16);
+	
+	while ( TRUE ) {
+		uint8_t row = rand() % 16;
+		uint8_t col = rand() % 8;
+		display_toggle(col, row);
+			
+		if (~PINB & KEY_Y) {
+			break;
+		}	
+		_delay_ms(20);
+	}
 }
 
 int main( void ) {
@@ -33,28 +54,17 @@ int main( void ) {
 	
 		/* Demo 1: Tetris */
 		tetris_start();
+		_delay_ms(300);
 		
 		/* Demo 4: Conways Game of Life */
 		conway_start();
+		_delay_ms(300);
 	
 		/* Demo 2: Laufschrift */
-		/*char text[] = "'Nobody will ever need more than 640k RAM!' - Bill Gates, 1981 ;-)";
-		uint16_t len = 4*strlen(text)+32; // 4 Bytes pro Character + 2 * 16 Bytes Padding
-		volatile uint8_t text_buffer[len];
-		display_print(text, text_buffer);
-	
-		// Starte Laufschrift
-		display_laufschrift(text_buffer, len, 120, 1);*/
+///		display_laufschrift("test", 120, 1);
 
 		/* Demo 3: Zufall */
-		/*volatile uint8_t random_buffer[16];
-		display_buffer = memset(random_buffer, 0, 16);
-		srand(get_seed());
-	
-		for (uint16_t i = 0; i < 450; i++) {
-			display_toggle(rand()%8, rand()%16);
-			display_buffer[0] = i;
-			_delay_ms(20);
-		}*/
+		random_start();
+		_delay_ms(300);
 	}
 }

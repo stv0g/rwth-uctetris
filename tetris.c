@@ -4,9 +4,12 @@
 
 #include "tetris.h"
 
-volatile tetris_t *volatile tetris = NULL;
+extern volatile uint8_t *volatile display_buffer; /* Buffer für Display */
 
-//static int16_t scoring[] = {0, 40, 100, 300, 1200}; /* scoring multiplicator for 0-4 flushed lines */
+volatile uint8_t *volatile brd = NULL; /* NULL if not in tetris mode */
+volatile stone_t stn;
+
+static int16_t scoring[] = {0, 40, 100, 300, 1200}; /* scoring multiplicator for 0-4 flushed lines */
 
 static clipping_t shapes[][4] = { /* including 4 ccw rotations */
 	{ // SHAPE_I
@@ -101,7 +104,7 @@ bool_t tetris_turn_stone() {
 		}
 	}
 	
-	copy_clipping(tmp, stn.clipping);
+	tetris_copy_clipping(tmp, stn.clipping);
 
 	return TRUE;
 }
@@ -168,24 +171,19 @@ bool_t tetris_detect_collision(direction_t dir) {
 }
 
 void tetris_start() {
-	tetris_t state;
-
+	uint8_t debounce = 0;
+	uint8_t lines = 0;
 	uint8_t frames = 48;
+	uint8_t score = 0;
 	uint8_t level = 0;
-	//uint16_t score = 0;
-	//uint16_t stones = 0;
-	uint16_t lines = 0;
-	uint8_t debounce;
 	
-	tetris = &state;
-	display_buffer = state.brd+4; /* skipping "virtual" lines */
+	brd = malloc(sizeof(board_t));
+	display_buffer = brd+4; /* skipping first 4 "virtual" lines */
 	
 	/* starting with empty board */
-	for (uint8_t i = 0; i < NUM_LINES; i++) {
-		brd[i] = 0;
-	}
+	memset(brd, 0, NUM_LINES);
 	
-	while (TRUE) { /* main loop */
+	while ( TRUE ) { /* main loop */
 		/* add new stone on the top of our board */
 		uint8_t shape = rand() % NUM_SHAPES;
 		uint8_t orientation = rand() % 4;
@@ -195,7 +193,7 @@ void tetris_start() {
 		stn.pos_x = 0;
 		stn.pos_y = 0;
 	
-		copy_clipping(shapes[shape][orientation], stn.clipping);		
+		tetris_copy_clipping(shapes[shape][orientation], stn.clipping);		
 	
 		if (lines > (level + 1) * 10) {
 			level++; /* next level */
@@ -233,16 +231,17 @@ void tetris_start() {
 						}
 					}
 					if (keys & KEY_Y) {
-						_delay_ms(10);
+						free(brd);
+						memset(stn.clipping, 0, 4);
 						return; // exit tetris
 					}
 				
 					if (keys) {
-						debounce = 6
+						debounce = 9;
 					}
 				}
 				
-				_delay_ms(900 / FRAMES); // sleep for 1 frame (10% for calculations)
+				_delay_ms(900 / FRAMES); // sleep for 1 frame (100ms approx for calculations)
 			}
 		} while (tetris_detect_collision(DIR_DOWN) == FALSE);
 		
@@ -251,17 +250,18 @@ void tetris_start() {
 		}
 	
 		/* check for completed lines and calculate score */
-		uint8_t flushed = flush_lines();
-		//score += (level + 1) * scoring[flushed];
-		//stones++;
+		uint8_t flushed = tetris_flush_lines();
+		score += (level + 1) * scoring[flushed];
 		lines += flushed;
 	
 		if (brd[3] > 0) {
-			//return; /* game over */
-			for (uint8_t i = 0; i < NUM_LINES; i++) { /* restart with empty board */
-				brd[i] = 0; /* starting with empty board */
-			}
-			_delay_ms(1000);
+			free(brd);
+			memset(stn.clipping, 0, 4);
+			return; /* game over */
 		}
 	}
+	
+	free(brd);
+	brd = NULL;
+	return;
 }
